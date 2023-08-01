@@ -7,6 +7,45 @@
 #include "SprayParticles.H"
 #endif
 
+void PeleC::checkMultiFab(const amrex::MultiFab& X, const std::string name, const char * FUNCTION, const int LINE, const bool CheckGuardCells, bool & hasBadValues)
+{
+  bool local = true;
+  hasBadValues = false;
+  if (CheckGuardCells)
+    {
+      if ( (!X.contains_nan(0, X.nComp(), amrex::IntVect(0), local) && !X.contains_inf(0, X.nComp(), amrex::IntVect(0), local)) &&
+	   (X.contains_nan(0, X.nComp(), amrex::IntVect(1), local) || X.contains_inf(0, X.nComp(), amrex::IntVect(1), local)) )
+	{
+	  hasBadValues = true;
+	  if (hasBadValues)
+	    {
+	      if (X.contains_nan(0, X.nComp(), amrex::IntVect(1,0,0), local) || X.contains_inf(0, X.nComp(), amrex::IntVect(1,0,0), local))
+		amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << " Function=" << FUNCTION << " Line=" << LINE << " : " << name << " has BAD values in X-dir GHOST Cells " << std::endl;
+	      if (X.contains_nan(0, X.nComp(), amrex::IntVect(0,1,0), local) || X.contains_inf(0, X.nComp(), amrex::IntVect(0,1,0), local))
+		amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << " Function=" << FUNCTION << " Line=" << LINE << " : " << name << " has BAD values in Y-dir GHOST Cells " << std::endl;
+	      if (X.contains_nan(0, X.nComp(), amrex::IntVect(0,0,1), local) || X.contains_inf(0, X.nComp(), amrex::IntVect(0,0,1), local))
+		amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << " Function=" << FUNCTION << " Line=" << LINE << " : " << name << " has BAD values in Z-dir GHOST Cells " << std::endl;
+		
+	    }
+	}
+      else if (X.contains_nan(0, X.nComp(), amrex::IntVect(0), local) || X.contains_inf(0, X.nComp(), amrex::IntVect(0), local))
+	{
+	  hasBadValues = true;
+	  amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << " Function=" << FUNCTION << " Line=" << LINE << " : " << name << " has BAD values" << std::endl;
+	}
+    }
+  else
+    {
+      if (X.contains_nan(0, X.nComp(), amrex::IntVect(0), local) || X.contains_inf(0, X.nComp(), amrex::IntVect(0), local))
+	{
+	  hasBadValues = true;
+	  amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << " Function=" << FUNCTION << " Line=" << LINE << " : " << name << " has BAD values" << std::endl;
+	}
+    }
+}
+
+
+
 amrex::Real
 PeleC::advance(
   amrex::Real time, amrex::Real dt, int amr_iteration, int amr_ncycle)
@@ -21,7 +60,7 @@ PeleC::advance(
   //        @param amr_ncycle  the number of subcycles at this level
 
   BL_PROFILE("PeleC::advance()");
-
+  
   int finest_level = parent->finestLevel();
 
   if (level < finest_level && do_reflux) {
@@ -47,6 +86,7 @@ PeleC::do_mol_advance(
   amrex::Real time, amrex::Real dt, int amr_iteration, int amr_ncycle)
 {
   BL_PROFILE("PeleC::do_mol_advance()");
+  bool hasBadValues;
 
   // Check that we are not asking to advance stuff we don't know to
   // if (src_list.size() > 0) amrex::Abort("Have not integrated other sources
@@ -65,6 +105,8 @@ PeleC::do_mol_advance(
 
   amrex::MultiFab& S_old = get_old_data(State_Type);
   amrex::MultiFab& S_new = get_new_data(State_Type);
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   amrex::MultiFab molSrc(grids, dmap, NVAR, 0, amrex::MFInfo(), Factory());
 
@@ -79,9 +121,12 @@ PeleC::do_mol_advance(
     get_new_data(Reactions_Type).setVal(0.0);
   }
   const amrex::MultiFab& I_R = get_new_data(Reactions_Type);
+  checkMultiFab(I_R, "I_R", __FUNCTION__, __LINE__, false, hasBadValues);
 
   set_body_state(S_old);
   set_body_state(S_new);
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   // Compute S^{n} = MOLRhs(U^{n})
   if (verbose != 0) {
@@ -95,9 +140,12 @@ PeleC::do_mol_advance(
   AMREX_ASSERT(Sborder.nGrow() >= nGrow_FP_border);
 #endif
 
+  checkMultiFab(Sborder, "Sborder before FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
   FillPatcherFill(Sborder, 0, NVAR, nGrow_FP_border, time, State_Type, 0);
+  checkMultiFab(Sborder, "Sborder after FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
   amrex::Real flux_factor = 0;
   getMOLSrcTerm(Sborder, molSrc, time, dt, flux_factor);
+  checkMultiFab(molSrc, "molSrc", __FUNCTION__, __LINE__, false, hasBadValues);
 
   // Build other (non-diffusion) sources at t_old
   for (int src : src_list) {
@@ -105,13 +153,19 @@ PeleC::do_mol_advance(
       construct_old_source(src, time, dt, amr_iteration, amr_ncycle, 0, 0);
 
       // add sources to molsrc
+      std::ostringstream ss;
+      ss << "*old_sources[" << src << "]";
+      checkMultiFab(*old_sources[src], ss.str(), __FUNCTION__, __LINE__, false, hasBadValues);
       amrex::MultiFab::Saxpy(molSrc, 1.0, *old_sources[src], 0, 0, NVAR, 0);
+      checkMultiFab(molSrc, "molSrc", __FUNCTION__, __LINE__, false, hasBadValues);
     }
   }
 
   if (mol_iters > 1) {
     amrex::MultiFab::Copy(molSrc_old, molSrc, 0, 0, NVAR, 0);
   }
+  checkMultiFab(molSrc_old, "molSrc_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(molSrc, "molSrc", __FUNCTION__, __LINE__, false, hasBadValues);
 
   // U^* = U^n + dt*S^n
   amrex::MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, molSrc, 0, 0, NVAR, 0);
@@ -121,15 +175,22 @@ PeleC::do_mol_advance(
     amrex::MultiFab::Saxpy(S_new, dt, I_R, 0, FirstSpec, NUM_SPECIES, 0);
     amrex::MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, Eden, 1, 0);
   }
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   computeTemp(S_new, 0);
+
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   // Compute S^{n+1} = MOLRhs(U^{n+1,*})
   if (verbose != 0) {
     amrex::Print() << "... Computing MOL source term at t^{n+1} " << std::endl;
   }
 
+  checkMultiFab(Sborder, "Sborder before FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
   FillPatcherFill(Sborder, 0, NVAR, nGrow_FP_border, time + dt, State_Type, 0);
+  checkMultiFab(Sborder, "Sborder after FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
   flux_factor = mol_iters > 1 ? 0 : 1;
   getMOLSrcTerm(Sborder, molSrc, time, dt, flux_factor);
 
@@ -137,6 +198,10 @@ PeleC::do_mol_advance(
   for (int src : src_list) {
     if (src != diff_src) {
       construct_new_source(src, time + dt, dt, amr_iteration, amr_ncycle, 0, 0);
+
+      std::ostringstream ss;
+      ss << "*new_sources[" << src << "]";
+      checkMultiFab(*new_sources[src], ss.str(), __FUNCTION__, __LINE__, false, hasBadValues);
 
       // add sources to molsrc
       amrex::MultiFab::Saxpy(molSrc, 1.0, *new_sources[src], 0, 0, NVAR, 0);
@@ -149,6 +214,9 @@ PeleC::do_mol_advance(
   amrex::MultiFab::Saxpy(
     S_new, 0.5 * dt, molSrc, 0, 0, NVAR,
     0); //  NOTE: If I_R=0, we are done and U_new is the final new-time state
+
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   if (do_react) {
     amrex::MultiFab::Saxpy(S_new, 0.5 * dt, I_R, 0, FirstSpec, NUM_SPECIES, 0);
@@ -165,7 +233,11 @@ PeleC::do_mol_advance(
     react_state(time, dt, false, &molSrc);
   }
 
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
   computeTemp(S_new, 0);
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   if (do_react) {
     for (int mol_iter = 2; mol_iter <= mol_iters; ++mol_iter) {
@@ -174,8 +246,11 @@ PeleC::do_mol_advance(
                        << mol_iter << " of " << mol_iters << ")" << std::endl;
       }
 
+      checkMultiFab(Sborder, "Sborder before FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
       FillPatcherFill(
         Sborder, 0, NVAR, nGrow_FP_border, time + dt, State_Type, 0);
+      checkMultiFab(Sborder, "Sborder after FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
+
       flux_factor = mol_iter == mol_iters ? 1 : 0;
       getMOLSrcTerm(Sborder, molSrc_new, time, dt, flux_factor);
 
@@ -183,14 +258,20 @@ PeleC::do_mol_advance(
       amrex::MultiFab::LinComb(
         molSrc, 0.5, molSrc_old, 0, 0.5, molSrc_new, 0, 0, NVAR, 0);
 
+      checkMultiFab(molSrc_old, "molSrc_old", __FUNCTION__, __LINE__, false, hasBadValues);
+      checkMultiFab(molSrc, "molSrc", __FUNCTION__, __LINE__, false, hasBadValues);
+      
       // Compute I_R and U^{n+1} = U^n + dt*(F_{AD} + I_R)
       react_state(time, dt, false, &molSrc);
+      checkMultiFab(molSrc, "molSrc", __FUNCTION__, __LINE__, false, hasBadValues);
 
       computeTemp(S_new, 0);
+      checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
     }
   }
 
   set_body_state(S_new);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   return dt;
 }
@@ -243,9 +324,15 @@ PeleC::do_sdc_iteration(
   // S_new here.  The update includes hydro, and the source terms.
 
   BL_PROFILE("PeleC::do_sdc_iteration()");
+  bool hasBadValues;
+
+  checkMultiFab(Sborder, "Sborder", __FUNCTION__, __LINE__, true, hasBadValues);
 
   const amrex::MultiFab& S_old = get_old_data(State_Type);
   amrex::MultiFab& S_new = get_new_data(State_Type);
+
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   initialize_sdc_iteration(
     time, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
@@ -271,9 +358,11 @@ PeleC::do_sdc_iteration(
   }
 #endif
 
+  checkMultiFab(Sborder, "Sborder before FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
   if (fill_Sborder) {
     FillPatcherFill(Sborder, 0, NVAR, nGrow_FP_border, time, State_Type, 0);
   }
+  checkMultiFab(Sborder, "Sborder after FillPatcherFill", __FUNCTION__, __LINE__, true, hasBadValues);
 
   if (sub_iteration == 0) {
 
@@ -312,10 +401,15 @@ PeleC::do_sdc_iteration(
   }
 
   // Construct S_new with current iterate of all sources
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
   construct_Snew(S_new, S_old, dt);
+
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   int ng_src = 0;
   computeTemp(S_new, ng_src);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   // Now update t_new sources (diffusion separate because it requires a fill
   // patch)
@@ -335,6 +429,7 @@ PeleC::do_sdc_iteration(
     getMOLSrcTerm(Sborder, *new_sources[diff_src], time, dt, flux_factor_new);
   }
 
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
   // Build other (non-diffusion) sources at t_new
   for (int n : src_list) {
     if (n != diff_src) {
@@ -343,6 +438,8 @@ PeleC::do_sdc_iteration(
     }
   }
 
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
   // Update I_R and rebuild S_new accordingly
   if (do_react) {
     react_state(time, dt);
@@ -350,11 +447,17 @@ PeleC::do_sdc_iteration(
     construct_Snew(S_new, S_old, dt);
     get_new_data(Reactions_Type).setVal(0);
   }
+  checkMultiFab(S_old, "S_old", __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   computeTemp(S_new, ng_src);
 
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
+
   finalize_sdc_iteration(
     time, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
+
+  checkMultiFab(S_new, "S_new", __FUNCTION__, __LINE__, false, hasBadValues);
 
   return dt;
 }

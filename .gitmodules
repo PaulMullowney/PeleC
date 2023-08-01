@@ -1,6 +1,7 @@
 [submodule "Submodules/AMReX"]
 	path = Submodules/AMReX
-	url = https://github.com/AMReX-Codes/amrex.git
+	url = git@github.com:PaulMullowney/amrex.git
+	branch = mi300
 [submodule "Submodules/PelePhysics"]
 	path = Submodules/PelePhysics
 	url = https://github.com/AMReX-Combustion/PelePhysics.git

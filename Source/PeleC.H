@@ -249,6 +249,8 @@ public:
   static void finalize_sdc_advance(
     amrex::Real time, amrex::Real dt, int amr_iteration, int amr_ncycle);
 
+  void checkMultiFab(const amrex::MultiFab& X, const std::string name, const char * FUNCTION, const int LINE, const bool CheckGuardCells, bool & hasBadValues);
+
   amrex::Real do_sdc_iteration(
     amrex::Real time,
     amrex::Real dt,
