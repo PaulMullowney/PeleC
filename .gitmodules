@@ -1,6 +1,6 @@
 [submodule "Submodules/AMReX"]
 	path = Submodules/AMReX
-	url = git@github.com:PaulMullowney/amrex.git
+	url = https://github.com/PaulMullowney/amrex.git
 	branch = rocShore
 [submodule "Submodules/PelePhysics"]
 	path = Submodules/PelePhysics
