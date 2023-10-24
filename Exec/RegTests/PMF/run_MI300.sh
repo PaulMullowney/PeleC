@@ -61,7 +61,7 @@ then
 	ARENA_SIZE=48000000000
     fi
     ARGS="pmf-lidryer-cvode.inp geometry.prob_lo=0. 0. 1. geometry.prob_hi=5.0 5.0 6.0 amr.n_cell=128 128 128 max_step=$MAX_STEP amrex.the_arena_init_size=$ARENA_SIZE ode.cfrhs_multi_kernel=$cfrhs_multi_kernel ode.cfrhs_min_blocks=$cfrhs_min_blocks"
-    mpirun -n $ranks ./PeleC3d.hip.x86-rome.TPROF.MPI.HIP.ex.$model ${ARGS}
+    mpirun -n $ranks ./PeleC3d.hip.TPROF.MPI.HIP.ex.$model ${ARGS}
 
 elif [[ $model == "drm19" ]]
 then
@@ -79,7 +79,7 @@ then
 	ARENA_SIZE=48000000000
     fi
     ARGS="pmf-drm19-cvode.inp geometry.prob_lo=0. 0. 1. geometry.prob_hi=5.0 5.0 6.0 amr.n_cell=128 128 128 max_step=$MAX_STEP amrex.the_arena_init_size=$ARENA_SIZE ode.cfrhs_multi_kernel=$cfrhs_multi_kernel ode.cfrhs_min_blocks=$cfrhs_min_blocks"
-    mpirun -n $ranks ./PeleC3d.hip.x86-rome.TPROF.MPI.HIP.ex.$model ${ARGS}
+    mpirun -n $ranks ./PeleC3d.hip.TPROF.MPI.HIP.ex.$model ${ARGS}
 
 elif [[ $model == "dodecane_lu" ]]
 then
@@ -104,7 +104,7 @@ then
     else
 	ARGS="pmf-dodecane-cvode.inp geometry.prob_lo=0. 0. 1. geometry.prob_hi=5.0 5.0 6.0 amr.n_cell=128 128 128 max_step=$MAX_STEP amrex.the_arena_init_size=$ARENA_SIZE ode.cfrhs_multi_kernel=$cfrhs_multi_kernel ode.cfrhs_min_blocks=$cfrhs_min_blocks pelec.init_shrink=1.0 pelec.change_max=1.0"
     fi
-    mpirun -n $ranks ./PeleC3d.hip.x86-rome.TPROF.MPI.HIP.ex.$model ${ARGS}
+    mpirun -n $ranks ./PeleC3d.hip.TPROF.MPI.HIP.ex.$model ${ARGS}
 
 elif [[ $model == "isooctane_lu" ]]
 then
@@ -124,6 +124,6 @@ then
     fi
 
     ARGS="pmf-isooctane.inp geometry.prob_lo=0. 0. 1. geometry.prob_hi=2.5 2.5 6.0 amr.n_cell=64 64 128 max_step=$MAX_STEP amrex.the_arena_init_size=$ARENA_SIZE ode.cfrhs_multi_kernel=$cfrhs_multi_kernel ode.cfrhs_min_blocks=$cfrhs_min_blocks"
-    mpirun -n $ranks ./PeleC3d.hip.x86-rome.TPROF.MPI.HIP.ex.$model ${ARGS}
+    mpirun -n $ranks ./PeleC3d.hip.TPROF.MPI.HIP.ex.$model ${ARGS}
 
 fi
