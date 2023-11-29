@@ -21,8 +21,18 @@ done
 
 export AMD_ARCH=$arch
 export ROCM_PATH=/opt/rocm
-export PATH=/opt/cmake-3.24.2/:/opt/ompi-5.0.0rc12/bin/:$PATH
-export MPI_HOME=/opt/ompi-5.0.0rc12/
+
+if test -d /opt/ompi-5.0.0/; then
+    export PATH=/opt/cmake-3.24.2/:/opt/ompi-5.0.0/bin/:$PATH
+    export MPI_HOME=/opt/ompi-5.0.0/
+elif test -d /opt/ompi-5.0.0-rc12/; then
+    export PATH=/opt/cmake-3.24.2/:/opt/ompi-5.0.0-rc12/bin/:$PATH
+    export MPI_HOME=/opt/ompi-5.0.0-rc12/
+else
+    echo "Could NOT find MPI Path. Exiting"
+    exit 1
+fi
+
 export HIP_PLATFORM=amd
 TRACE=FALSE
 

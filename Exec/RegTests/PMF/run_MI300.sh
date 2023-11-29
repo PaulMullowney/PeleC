@@ -1,6 +1,13 @@
 #!/bin/bash -l
 
-export PATH=/opt/ompi-5.0.0rc12/bin/:$PATH
+if test -d /opt/ompi-5.0.0/; then
+    export PATH=/opt/ompi-5.0.0/bin/:$PATH
+elif test -d /opt/ompi-5.0.0-rc12/; then
+    export PATH=/opt/ompi-5.0.0-rc12/bin/:$PATH
+else
+    echo "Could NOT find MPI Path. Exiting"
+    exit 1
+fi
 model=LiDryer
 ranks=1
 cfrhs_multi_kernel=0
