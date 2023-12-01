@@ -1,13 +1,5 @@
 #!/bin/bash -l
 
-if test -d /opt/ompi-5.0.0/; then
-    export PATH=/opt/ompi-5.0.0/bin/:$PATH
-elif test -d /opt/ompi-5.0.0-rc12/; then
-    export PATH=/opt/ompi-5.0.0-rc12/bin/:$PATH
-else
-    echo "Could NOT find MPI Path. Exiting"
-    exit 1
-fi
 model=LiDryer
 ranks=1
 cfrhs_multi_kernel=0
@@ -39,6 +31,10 @@ for i in "$@"; do
             cfrhs_min_blocks="${i#*=}"
             shift # past argument=value
             ;;
+        -with-mpi=*|--with-mpi=*)
+	    mpi="${i#*=}"
+	    shift # past argument=value
+	    ;;
 	-fast|--fast)
             fast=YES
             shift # past argument=value
@@ -49,6 +45,26 @@ for i in "$@"; do
             ;;
     esac
 done
+
+if [ -z ${mpi+x} ]; #check if value is passed as an arg
+then
+    #attempt to read any ompi version in /opt
+    mpi=$(readlink -f /opt/omp*)
+    if test -d $mpi; then
+	export PATH=$mpi/bin/:$PATH
+    else
+	echo "Could NOT find MPI Path. Exiting"
+	exit 1
+    fi
+else
+    if test -d $mpi/; #check value of passed argument
+    then
+	export PATH=$mpi/bin/:$PATH
+    else
+	echo "MPI arg not a real path. Exiting"
+	exit 1
+    fi
+fi
 
 echo $model, $ranks
 

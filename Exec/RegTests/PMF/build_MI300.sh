@@ -12,7 +12,11 @@ for i in "$@"; do
             arch="${i#*=}"
             shift # past argument=value
             ;;
-        --)
+        -with-mpi=*|--with-mpi=*)
+	    mpi="${i#*=}"
+	    shift # past argument=value
+	    ;;
+	--)
             shift
             break
             ;;
@@ -21,16 +25,27 @@ done
 
 export AMD_ARCH=$arch
 export ROCM_PATH=/opt/rocm
-
-if test -d /opt/ompi-5.0.0/; then
-    export PATH=/opt/cmake-3.24.2/:/opt/ompi-5.0.0/bin/:$PATH
-    export MPI_HOME=/opt/ompi-5.0.0/
-elif test -d /opt/ompi-5.0.0-rc12/; then
-    export PATH=/opt/cmake-3.24.2/:/opt/ompi-5.0.0-rc12/bin/:$PATH
-    export MPI_HOME=/opt/ompi-5.0.0-rc12/
+export PATH=/opt/cmake-3.24.2/:$PATH
+if [ -z ${mpi+x} ]; #check if value is passed as an arg
+then
+    #attempt to read any ompi version in /opt
+    mpi=$(readlink -f /opt/omp*)
+    if test -d $mpi; then
+	export PATH=$mpi/bin/:$PATH
+	export MPI_HOME=$mpi
+    else
+	echo "Could NOT find MPI Path. Exiting"
+	exit 1
+    fi
 else
-    echo "Could NOT find MPI Path. Exiting"
-    exit 1
+    if test -d $mpi/; #check value of passed argument
+    then
+	export PATH=$mpi/bin/:$PATH
+	export MPI_HOME=$mpi
+    else
+	echo "MPI arg not a real path. Exiting"
+	exit 1
+    fi
 fi
 
 export HIP_PLATFORM=amd
