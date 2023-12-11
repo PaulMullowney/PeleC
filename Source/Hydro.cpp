@@ -1,4 +1,5 @@
 #include "Hydro.H"
+#include "PeleC.H"
 
 // Set up the source terms to go into the hydro.
 void
@@ -11,6 +12,7 @@ PeleC::construct_hydro_source(
   int sub_iteration,
   int sub_ncycle)
 {
+  bool hasBadValues=false;
   if (do_mol) {
     if ((verbose != 0) && amrex::ParallelDescriptor::IOProcessor()) {
       amrex::Print() << "... Zeroing Godunov-based hydro advance" << std::endl;
@@ -28,10 +30,22 @@ PeleC::construct_hydro_source(
     const int ng = 0;
     sources_for_hydro.setVal(0.0);
     for (int src : src_list) {
+      {
+	std::ostringstream sstream1;
+	sstream1 << "*old_sources[" << src << "]";
+	checkMultiFab(*old_sources[src], sstream1.str(), __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+      }
+      {
+	std::ostringstream sstream1;
+	sstream1 << "*new_sources[" << src << "]";
+	checkMultiFab(*new_sources[src], sstream1.str(), __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+      }
       amrex::MultiFab::Saxpy(
         sources_for_hydro, 0.5, *new_sources[src], 0, 0, NVAR, ng);
+      checkMultiFab(sources_for_hydro, "sources_for_hydro", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
       amrex::MultiFab::Saxpy(
         sources_for_hydro, 0.5, *old_sources[src], 0, 0, NVAR, ng);
+      checkMultiFab(sources_for_hydro, "sources_for_hydro", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     }
 
     // Add I_R terms to advective forcing
@@ -39,19 +53,24 @@ PeleC::construct_hydro_source(
       amrex::MultiFab::Add(
         sources_for_hydro, get_new_data(Reactions_Type), 0, FirstSpec,
         NUM_SPECIES, ng);
+      checkMultiFab(sources_for_hydro, "sources_for_hydro", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
       amrex::MultiFab::Add(
         sources_for_hydro, get_new_data(Reactions_Type), NUM_SPECIES, Eden, 1,
         ng);
+      checkMultiFab(sources_for_hydro, "sources_for_hydro", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     }
     sources_for_hydro.FillBoundary(geom.periodicity());
+    checkMultiFab(sources_for_hydro, "sources_for_hydro", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     hydro_source.setVal(0);
-
+    checkMultiFab(hydro_source, "hydro_source", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+ 
     const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx =
       geom.CellSizeArray();
 
     amrex::Real courno = std::numeric_limits<amrex::Real>::lowest();
 
     const amrex::MultiFab& S_new = get_new_data(State_Type);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
 
     auto const& fact =
       dynamic_cast<amrex::EBFArrayBoxFactory const&>(S.Factory());
@@ -94,6 +113,10 @@ PeleC::construct_hydro_source(
 
         auto const& sarr = S.array(mfi);
         auto const& hyd_src = hydro_source.array(mfi);
+	amrex::Gpu::Device::streamSynchronize();
+	amrex::Print() << __FUNCTION__ << "::" << __LINE__ << std::endl;
+	checkArray4(sarr, "sarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+	checkArray4(hyd_src, "hyd_src", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
         // Temporary Fabs
         amrex::FArrayBox q(qbx, QVAR, amrex::The_Async_Arena());
@@ -104,7 +127,6 @@ PeleC::construct_hydro_source(
         auto const& qarr = q.array();
         auto const& qauxar = qaux.array();
         auto const& srcqarr = src_q.array();
-
         {
           BL_PROFILE("PeleC::ctoprim()");
           amrex::ParallelFor(
@@ -164,6 +186,8 @@ PeleC::construct_hydro_source(
         {
           BL_PROFILE("PeleC::srctoprim()");
           const auto& src_in = sources_for_hydro.array(mfi);
+	  amrex::Gpu::Device::streamSynchronize();
+	  checkArray4(src_in, "src_in", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
           amrex::ParallelFor(
             qbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
               if (!flag_arr(i, j, k).isCovered()) {
@@ -189,6 +213,8 @@ PeleC::construct_hydro_source(
         if (flag_fab.getType(fbxg_i) == amrex::FabType::singlevalued) {
 
           auto const& vfrac_arr = vfrac.const_array(mfi);
+	  amrex::Gpu::Device::streamSynchronize();
+	  checkArray4(vfrac_arr, "vfrac_arr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
           amrex::EBFluxRegister* fr_as_crse =
             (do_reflux && (level < parent->finestLevel()))
@@ -256,6 +282,7 @@ PeleC::construct_hydro_source(
         // Filter hydro source and fluxes here
         if (use_explicit_filter) {
           BL_PROFILE("PeleC::apply_filter()");
+	  amrex::Print() << __FUNCTION__ << " use_explicit_filter::" << __LINE__ << std::endl;
           for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
             const amrex::Box& bxtmp = amrex::surroundingNodes(bx, dir);
             amrex::FArrayBox filtered_flux(
@@ -281,6 +308,7 @@ PeleC::construct_hydro_source(
         // Refluxing
         if (do_reflux && sub_iteration == sub_ncycle - 1) {
           const amrex::FabType gtyp = flag_fab.getType(amrex::grow(bx, 1));
+          amrex::Print() << __FUNCTION__ << " Refluxing ::" << __LINE__ << std::endl;
           amrex::FArrayBox dm_as_fine(
             amrex::Box::TheUnitBox(), hyd_src.nComp(),
             amrex::The_Async_Arena());
@@ -330,6 +358,14 @@ pc_umdrv(
   amrex::Array4<amrex::Real> const& vol,
   amrex::Real /*cflLoc*/)
 {
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
+  checkArray4(uin, "uin", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(q, "q", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qaux, "qaux", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(src_q, "src_q", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+
+	  
   // Set Up for Hydro Flux Calculations
   auto const& bxg2 = grow(bx, 2);
   amrex::FArrayBox qec[AMREX_SPACEDIM];
@@ -345,6 +381,7 @@ pc_umdrv(
   amrex::FArrayBox pdivu(bx, 1, amrex::The_Async_Arena());
   auto const& divuarr = divu.array();
   auto const& pdivuarr = pdivu.array();
+  checkArray4(pdivuarr, "pdivuarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   {
     BL_PROFILE("PeleC::umeth()");
@@ -365,6 +402,8 @@ pc_umdrv(
       weno_scheme);
 #endif
   }
+  checkArray4(divuarr, "divuarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(pdivuarr, "pdivuarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // divu
   amrex::ParallelFor(bxg2, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -375,6 +414,7 @@ pc_umdrv(
 
   // consup
   pc_consup(bx, uout, flx, vol, pdivuarr);
+  checkArray4(uout, "uout", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 }
 
 void
@@ -412,10 +452,16 @@ pc_consup(
   const amrex::Array4<const amrex::Real>& pdivu)
 {
   BL_PROFILE("PeleC::pc_consup()");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
+  checkArray4(vol, "vol", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(pdivu, "pdivu", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+
   // Combine for Hydro Sources
   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_update(i, j, k, update, flx, vol, pdivu);
   });
+  checkArray4(update, "update", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 }
 
 void

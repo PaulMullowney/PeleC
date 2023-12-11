@@ -3,6 +3,64 @@
 #include "PeleC.H"
 #include "IndexDefines.H"
 
+#include <thrust/count.h>
+#include <thrust/execution_policy.h>
+
+template <typename T>
+struct is_bad
+{
+  __host__ __device__
+  bool operator()(const T &x)
+  {
+    return isinf(x) || isnan(x);
+  }
+};
+
+void PeleC::checkMultiFab(const amrex::MultiFab& X, const std::string name,
+			  const char * FILE, const char * FUNCTION, const int LINE,
+			  const bool CheckGuardCells, bool& hasBadValues)
+{
+  amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::" << FUNCTION << "::L#" << LINE << " : " << name << std::endl;
+  if (CheckGuardCells)
+  {
+    if ( (!X.contains_nan(0, X.nComp(), amrex::IntVect(0)) && !X.contains_inf(0, X.nComp(), amrex::IntVect(0))) &&
+	 (X.contains_nan(0, X.nComp(), amrex::IntVect(1)) || X.contains_inf(0, X.nComp(), amrex::IntVect(1))) )
+      {
+	amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::" << FUNCTION << "::L#" << LINE << " : " << name << " has BAD values in GHOST Cells" << std::endl;
+	hasBadValues=true;
+      }
+    else if (X.contains_nan(0, X.nComp(), amrex::IntVect(0)) || X.contains_inf(0, X.nComp(), amrex::IntVect(0)))
+      {
+	amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::" << FUNCTION << "::L#" << LINE << " : " << name << " has BAD values" << std::endl;
+	hasBadValues=true;
+      }
+  }
+  else
+  {
+    if (X.contains_nan(0, X.nComp(), amrex::IntVect(0)) || X.contains_inf(0, X.nComp(), amrex::IntVect(0)))
+      {
+	amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::" << FUNCTION << "::L#" << LINE << " : " << name << " has BAD values" << std::endl;
+	hasBadValues=true;
+      }
+  }
+}
+
+void checkArray4(amrex::Array4<const amrex::Real> const X, const std::string name,
+		 const char * FILE, const char * FUNCTION, const int LINE,
+		 bool& hasBadValues)
+{
+  auto numBad1 = amrex::FArrayBox(X).count_bad<amrex::RunOn::Device>();
+  if (numBad1)
+    {
+      auto numBad2 = thrust::count_if(thrust::device.on(amrex::Gpu::gpuStream()), X.dataPtr(), X.dataPtr()+X.size(), is_bad<amrex::Real>());
+      amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::"
+		     << FUNCTION << "::L#" << LINE << " : " << name << " has " << numBad1 << " BAD (AMReX reduction) values out of " << X.size() << std::endl;
+      amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::"
+		     << FUNCTION << "::L#" << LINE << " : " << name << " has " << numBad2 << " BAD (Thrust reduction) values out of " << X.size() << std::endl;
+      amrex::Abort("Exiting");
+    }
+}
+
 #ifdef PELEC_USE_SPRAY
 #include "SprayParticles.H"
 #endif
@@ -21,6 +79,8 @@ PeleC::advance(
   //        @param amr_ncycle  the number of subcycles at this level
 
   BL_PROFILE("PeleC::advance()");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
 
   int finest_level = parent->finestLevel();
 
@@ -47,6 +107,8 @@ PeleC::do_mol_advance(
   amrex::Real time, amrex::Real dt, int amr_iteration, int amr_ncycle)
 {
   BL_PROFILE("PeleC::do_mol_advance()");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
 
   // Check that we are not asking to advance stuff we don't know to
   // if (src_list.size() > 0) amrex::Abort("Have not integrated other sources
@@ -200,6 +262,8 @@ PeleC::do_sdc_advance(
   amrex::Real time, amrex::Real dt, int amr_iteration, int amr_ncycle)
 {
   BL_PROFILE("PeleC::do_sdc_advance()");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
 
   amrex::Real dt_new = dt;
 
@@ -243,9 +307,13 @@ PeleC::do_sdc_iteration(
   // S_new here.  The update includes hydro, and the source terms.
 
   BL_PROFILE("PeleC::do_sdc_iteration()");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
 
   const amrex::MultiFab& S_old = get_old_data(State_Type);
   amrex::MultiFab& S_new = get_new_data(State_Type);
+  checkMultiFab(S_old, "S_old", __FILE__, __FUNCTION__, __LINE__, false, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, false, hasBadValues);
 
   initialize_sdc_iteration(
     time, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
@@ -271,9 +339,11 @@ PeleC::do_sdc_iteration(
   }
 #endif
 
+  checkMultiFab(Sborder, "Sborder before FillPatcherFill", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   if (fill_Sborder) {
     FillPatcherFill(Sborder, 0, NVAR, nGrow_FP_border, time, State_Type, 0);
   }
+  checkMultiFab(Sborder, "Sborder after FillPatcherFill", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
 
   if (sub_iteration == 0) {
 
@@ -283,6 +353,9 @@ PeleC::do_sdc_iteration(
         construct_old_source(
           n, time, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
       }
+      std::ostringstream sstream1;
+      sstream1 << "*old_sources[" << n << "]";
+      checkMultiFab(*(old_sources[n]),sstream1.str(),__FILE__, __FUNCTION__,__LINE__,false, hasBadValues);
     }
 
     // Get diffusion source separate from other sources, since it requires grow
@@ -297,12 +370,15 @@ PeleC::do_sdc_iteration(
 
       getMOLSrcTerm(
         Sborder, *old_sources[diff_src], time, dt, reflux_factor_old);
+      checkMultiFab(*old_sources[diff_src], "old sources", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     }
 
     // Initialize sources at t_new by copying from t_old
     for (int src : src_list) {
       amrex::MultiFab::Copy(
         *new_sources[src], *old_sources[src], 0, 0, NVAR, 0);
+      checkMultiFab(*new_sources[src], "old sources", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+      checkMultiFab(*old_sources[src], "old sources", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     }
   }
 
@@ -310,13 +386,17 @@ PeleC::do_sdc_iteration(
   if (do_hydro) {
     construct_hydro_source(
       Sborder, time, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
+    checkMultiFab(Sborder, "Sborder", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   }
 
   // Construct S_new with current iterate of all sources
+  checkMultiFab(S_old, "S_old", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   construct_Snew(S_new, S_old, dt);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
 
   int ng_src = 0;
   computeTemp(S_new, ng_src);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
 
   // Now update t_new sources (diffusion separate because it requires a fill
   // patch)
@@ -325,7 +405,9 @@ PeleC::do_sdc_iteration(
     if (do_spray_particles && level > 0) {
       nGrowDiff = amrex::max(nGrowDiff, nGrow_FP_border);
     }
+    checkMultiFab(Sborder, "Sborder", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     FillPatcherFill(Sborder, 0, NVAR, nGrowDiff, time + dt, State_Type, 0);
+    checkMultiFab(Sborder, "Sborder", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   }
   if (do_diffuse) {
     if (verbose != 0) {
@@ -341,6 +423,9 @@ PeleC::do_sdc_iteration(
     if (n != diff_src) {
       construct_new_source(
         n, time + dt, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
+      std::ostringstream sstream1;
+      sstream1 << "*new_sources[" << n << "]";
+      checkMultiFab(*(new_sources[n]),sstream1.str(),__FILE__, __FUNCTION__,__LINE__,false, hasBadValues);
     }
   }
 
@@ -349,10 +434,12 @@ PeleC::do_sdc_iteration(
     react_state(time, dt);
   } else {
     construct_Snew(S_new, S_old, dt);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     get_new_data(Reactions_Type).setVal(0);
   }
 
   computeTemp(S_new, ng_src);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
 
   finalize_sdc_iteration(
     time, dt, amr_iteration, amr_ncycle, sub_iteration, sub_ncycle);
@@ -365,20 +452,40 @@ PeleC::construct_Snew(
   amrex::MultiFab& S_new, const amrex::MultiFab& S_old, amrex::Real dt)
 {
   int ng = 0;
-
+  bool hasBadValues=false;
+    
   amrex::MultiFab::Copy(S_new, S_old, 0, 0, NVAR, ng);
+  checkMultiFab(S_old, "S_old", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   for (int src : src_list) {
+    {
+      std::ostringstream sstream1;
+      sstream1 << "*old_sources[" << src << "]";
+      checkMultiFab(*old_sources[src], sstream1.str(), __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+    }
+    {
+      std::ostringstream sstream1;
+      sstream1 << "*new_sources[" << src << "]";
+      checkMultiFab(*new_sources[src], sstream1.str(), __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
+    }
     amrex::MultiFab::Saxpy(S_new, 0.5 * dt, *new_sources[src], 0, 0, NVAR, ng);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     amrex::MultiFab::Saxpy(S_new, 0.5 * dt, *old_sources[src], 0, 0, NVAR, ng);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   }
   if (do_hydro) {
+    checkMultiFab(hydro_source, "hydro_source", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     amrex::MultiFab::Saxpy(S_new, dt, hydro_source, 0, 0, NVAR, ng);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   }
 
   if (do_react) {
     const amrex::MultiFab& I_R = get_new_data(Reactions_Type);
+    checkMultiFab(I_R, "I_R", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     amrex::MultiFab::Saxpy(S_new, dt, I_R, 0, FirstSpec, NUM_SPECIES, 0);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
     amrex::MultiFab::Saxpy(S_new, dt, I_R, NUM_SPECIES, Eden, 1, 0);
+    checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   }
 }
 

@@ -702,6 +702,9 @@ PeleC::initData()
 {
   BL_PROFILE("PeleC::initData()");
 
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
+
   // Copy problem parameter structs to device
   amrex::Gpu::copy(
     amrex::Gpu::hostToDevice, PeleC::h_prob_parm_device,
@@ -750,7 +753,8 @@ PeleC::initData()
   }
 
   enforce_consistent_e(S_new);
-
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, false, hasBadValues);
+ 
   set_body_state(S_new);
   amrex::Real cur_time = state[State_Type].curTime();
   const amrex::StateDescriptor* desc = state[State_Type].descriptor();
@@ -775,6 +779,8 @@ void
 PeleC::init(AmrLevel& old)
 {
   BL_PROFILE("PeleC::init(old)");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
 
   auto* oldlev = (PeleC*)&old;
 
@@ -786,7 +792,9 @@ PeleC::init(AmrLevel& old)
   setTimeLevel(cur_time, dt_old, dt_new);
 
   amrex::MultiFab& S_new = get_new_data(State_Type);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, true, hasBadValues);
   FillPatch(old, S_new, 0, cur_time, State_Type, 0, NVAR);
+  checkMultiFab(S_new, "S_new", __FILE__, __FUNCTION__, __LINE__, false, hasBadValues);
 
   amrex::MultiFab& React_new = get_new_data(Reactions_Type);
 

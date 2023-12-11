@@ -1,11 +1,11 @@
 [submodule "Submodules/AMReX"]
 	path = Submodules/AMReX
 	url = https://github.com/PaulMullowney/amrex.git
-	branch = rocShore
+	branch = rocShore-debug
 [submodule "Submodules/PelePhysics"]
 	path = Submodules/PelePhysics
 	url = https://github.com/PaulMullowney/PelePhysics.git
-	branch = rocShore
+	branch = rocShore-debug
 [submodule "Submodules/PeleMP"]
 	path = Submodules/PeleMP
 	url = https://github.com/AMReX-Combustion/PeleMP.git

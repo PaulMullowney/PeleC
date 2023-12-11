@@ -35,6 +35,8 @@ PeleC::react_state(
 {
   // Update I_R, and recompute S_new
   BL_PROFILE("PeleC::react_state()");
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
 
   const amrex::Real strt_time = amrex::ParallelDescriptor::second();
 
@@ -121,7 +123,6 @@ PeleC::react_state(
   auto const& fact =
     dynamic_cast<amrex::EBFArrayBoxFactory const&>(S_new.Factory());
   auto const& flags = fact.getMultiEBCellFlagFab();
-
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -199,6 +200,12 @@ PeleC::react_state(
 
             frcEExt(i, j, k) = rhoedot_ext;
           });
+
+	checkArray4(frcExt, "frcExt", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+	checkArray4(frcEExt, "frcEExt", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+	checkArray4(rhoY, "rhoY", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+	checkArray4(rhoE, "rhoE", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+	checkArray4(T, "T", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
         reactor->react(
           bx, rhoY, frcExt, T, rhoE, frcEExt, fc, mask, dt, current_time

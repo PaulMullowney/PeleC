@@ -1,6 +1,7 @@
 #include "Godunov.H"
 #include "PLM.H"
 #include "PPM.H"
+#include "PeleC.H"
 
 // Host function that overwrites fluxes with lower-order approximation
 void
@@ -68,6 +69,12 @@ pc_umeth_3D(
   const bool use_hybrid_weno,
   const int weno_scheme)
 {
+  amrex::Print() << "Entering " << __FILE__ << "::" << __FUNCTION__ << std::endl;
+  bool hasBadValues=false;
+  checkArray4(q, "q", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qaux, "qaux", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(srcQ, "srcQ", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+    
   amrex::Real const dx = del[0];
   amrex::Real const dy = del[1];
   amrex::Real const dz = del[2];
@@ -180,7 +187,14 @@ pc_umeth_3D(
   } else {
     amrex::Error("PeleC::ppm_type must be 0 (PLM) or 1 (PPM)");
   }
-
+#if 1
+  checkArray4(qxmarr, "qxmarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qymarr, "qymarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qzmarr, "qzmarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qxparr, "qxparr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qyparr, "qyparr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qzparr, "qzparr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   // These are the first flux estimates as per the corner-transport-upwind
   // method X initial fluxes
   cdir = 0;
@@ -194,7 +208,10 @@ pc_umeth_3D(
         i, j, k, bclx, bchx, dlx, dhx, qxmarr, qxparr, fxarr, gdtempx, qaux,
         cdir);
     });
-
+#if 1
+  checkArray4(fxarr, "fxarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(gdtempx, "gdtempx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   // Y initial fluxes
   cdir = 1;
   amrex::FArrayBox fy(yflxbx, NVAR, amrex::The_Async_Arena());
@@ -207,7 +224,10 @@ pc_umeth_3D(
         i, j, k, bcly, bchy, dly, dhy, qymarr, qyparr, fyarr, gdtempy, qaux,
         cdir);
     });
-
+#if 1
+  checkArray4(fyarr, "fyarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(gdtempy, "gdtempy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   // Z initial fluxes
   cdir = 2;
   amrex::FArrayBox fz(zflxbx, NVAR, amrex::The_Async_Arena());
@@ -220,7 +240,10 @@ pc_umeth_3D(
         i, j, k, bclz, bchz, dlz, dhz, qzmarr, qzparr, fzarr, gdtempz, qaux,
         cdir);
     });
-
+#if 1
+  checkArray4(fzarr, "fzarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(gdtempz, "gdtempz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   // X interface corrections
   cdir = 0;
   const amrex::Box& txbx = grow(bxg1, cdir, 1);
@@ -245,7 +268,12 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, 2, qmxz, qpxz, qxmarr, qxparr, fzarr, qaux,
       gdtempz, cdtdz);
   });
-
+#if 1
+  checkArray4(qmxy, "qmxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qpxy, "qpxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qmxz, "qmxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qpxz, "qpxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   const amrex::Box& txfxbx = surroundingNodes(bxg1, cdir);
   amrex::FArrayBox fluxxy(txfxbx, NVAR, amrex::The_Async_Arena());
   amrex::FArrayBox fluxxz(txfxbx, NVAR, amrex::The_Async_Arena());
@@ -267,7 +295,12 @@ pc_umeth_3D(
       pc_cmpflx(
         i, j, k, bclx, bchx, dlx, dhx, qmxz, qpxz, flxz, qxz, qaux, cdir);
     });
-
+#if 1
+  checkArray4(flxy, "flxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(flxz, "flxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qxy, "qxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qxz, "qxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   // Y interface corrections
   cdir = 1;
   const amrex::Box& tybx = grow(bxg1, cdir, 1);
@@ -291,7 +324,13 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, 2, qmyz, qpyz, qymarr, qyparr, fzarr, qaux,
       gdtempz, cdtdz);
   });
-
+  
+#if 1
+  //checkArray4(qmyx, "qmyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  //checkArray4(qpyx, "qpyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  //checkArray4(qmyz, "qmyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  //checkArray4(qpyz, "qpyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
   // Riemann problem Y|X Y|Z
   const amrex::Box& tyfxbx = surroundingNodes(bxg1, cdir);
   amrex::FArrayBox fluxyx(tyfxbx, NVAR, amrex::The_Async_Arena());
@@ -314,6 +353,13 @@ pc_umeth_3D(
         i, j, k, bcly, bchy, dly, dhy, qmyz, qpyz, flyz, qyz, qaux, cdir);
     });
 
+#if 1
+  checkArray4(flyx, "flyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(flyz, "flyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qyx, "qyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qyz, "qyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
+  
   // Z interface corrections
   cdir = 2;
   const amrex::Box& tzbx = grow(bxg1, cdir, 1);
@@ -338,6 +384,12 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, 1, qmzy, qpzy, qzmarr, qzparr, fyarr, qaux,
       gdtempy, cdtdy);
   });
+#if 1
+  checkArray4(qmzx, "qmzx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qpzx, "qpzx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qmzy, "qmzy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qpzy, "qpzy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Riemann problem Z|X Z|Y
   const amrex::Box& tzfxbx = surroundingNodes(bxg1, cdir);
@@ -360,6 +412,12 @@ pc_umeth_3D(
       pc_cmpflx(
         i, j, k, bclz, bchz, dlz, dhz, qmzy, qpzy, flzy, qzy, qaux, cdir);
     });
+#if 1
+  checkArray4(flzx, "flzx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(flzy, "flzy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qzx, "qyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qzy, "qzy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Temp Fabs for Final Fluxes
   amrex::FArrayBox qmfab(bxg2, QVAR, amrex::The_Async_Arena());
@@ -376,12 +434,16 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, qm, qp, qxmarr, qxparr, flyz, flzy, qyz, qzy,
       qaux, srcQ, hdt, hdtdy, hdtdz);
   });
+  checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Final X flux
   amrex::ParallelFor(xfxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_cmpflx(
       i, j, k, bclx, bchx, dlx, dhx, qm, qp, flx[0], qec[0], qaux, cdir);
   });
+  checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Y | X&Z
   cdir = 1;
@@ -392,12 +454,16 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, qm, qp, qymarr, qyparr, flxz, flzx, qxz, qzx,
       qaux, srcQ, hdt, hdtdx, hdtdz);
   });
+  checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Final Y flux
   amrex::ParallelFor(yfxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_cmpflx(
       i, j, k, bcly, bchy, dly, dhy, qm, qp, flx[1], qec[1], qaux, cdir);
   });
+  checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Z | X&Y
   cdir = 2;
@@ -408,12 +474,16 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, qm, qp, qzmarr, qzparr, flxy, flyx, qxy, qyx,
       qaux, srcQ, hdt, hdtdx, hdtdy);
   });
+  checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Final Z flux
   amrex::ParallelFor(zfxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_cmpflx(
       i, j, k, bclz, bchz, dlz, dhz, qm, qp, flx[2], qec[2], qaux, cdir);
   });
+  checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Fix bcnormal boundaries - always use PLM and don't do N+1/2 predictor
   // because the user specifies conditions at N
@@ -451,6 +521,9 @@ pc_umeth_3D(
       i, j, k, pdivu, AMREX_D_DECL(qec[0], qec[1], qec[2]),
       AMREX_D_DECL(a[0], a[1], a[2]), vol);
   });
+  checkArray4(vol, "vol", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(pdivu, "pdivu", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  
 }
 
 #elif AMREX_SPACEDIM == 2
@@ -551,6 +624,11 @@ pc_umeth_2D(
   } else {
     amrex::Error("PeleC::ppm_type must be 0 (PLM) or 1 (PPM)");
   }
+  checkArray4(qxmarr, "qxmarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qxparr, "qxparr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qymarr, "qymarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qyparr, "qyparr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+
   // These are the first flux estimates as per the corner-transport-upwind
   // method X initial fluxes
   cdir = 0;
@@ -564,6 +642,8 @@ pc_umeth_2D(
         i, j, k, bclx, bchx, dlx, dhx, qxmarr, qxparr, fxarr, gdtemp, qaux,
         cdir);
     });
+  checkArray4(fxarr, "fxarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(gdtemp, "gdtemp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Y initial fluxes
   cdir = 1;
@@ -575,6 +655,7 @@ pc_umeth_2D(
         i, j, k, bcly, bchy, dly, dhy, qymarr, qyparr, fyarr, qec[1], qaux,
         cdir);
     });
+  checkArray4(fyarr, "fyarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // X interface corrections
   cdir = 0;
@@ -618,6 +699,8 @@ pc_umeth_2D(
     pc_cmpflx(
       i, j, k, bcly, bchy, dly, dhy, qmarr, qparr, flx[1], qec[1], qaux, cdir);
   });
+  checkArray4(qmarr, "qmarr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qparr, "qparr", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 
   // Fix bcnormal boundaries - always use PLM and don't do N+1/2 predictor
   // because the user specifies conditions at N

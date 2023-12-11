@@ -29,6 +29,11 @@ enum StateType { State_Type = 0, Reactions_Type, Work_Estimate_Type };
 
 // Create storage for all source terms.
 
+void checkArray4(amrex::Array4<const amrex::Real> const X, const std::string name,
+		 const char * FILE, const char * FUNCTION, const int LINE,
+		 bool& hasBadValues);
+  
+
 enum sources {
   ext_src = 0,
   forcing_src,
@@ -261,7 +266,10 @@ public:
 
   static void finalize_sdc_advance(
     amrex::Real time, amrex::Real dt, int amr_iteration, int amr_ncycle);
-
+  
+  void checkMultiFab(const amrex::MultiFab& X, const std::string name,
+		     const char * FILE, const char * FUNCTION, const int LINE,
+		     const bool CheckGuardCells, bool& hasBadValues);
   amrex::Real do_sdc_iteration(
     amrex::Real time,
     amrex::Real dt,
