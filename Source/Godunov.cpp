@@ -296,11 +296,228 @@ pc_umeth_3D(
         i, j, k, bclx, bchx, dlx, dhx, qmxz, qpxz, flxz, qxz, qaux, cdir);
     });
 #if 1
-  checkArray4(flxy, "flxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  hasBadValues = checkArray4(flxy, "flxy", __FILE__, __FUNCTION__, __LINE__);
+  //hasBadValues = true;
+  if (hasBadValues) {
+#define PELE_USE_HIP_DEBUG  
+#ifdef PELE_USE_HIP_DEBUG
+    std::string name;
+    if (NUM_SPECIES==9) name="LiDryer";
+    else if (NUM_SPECIES==53) name="dodecane_lu";
+    else name="drm19";
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_repro2_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"bclo, bchi, dlx, dhx, cdir, ncells, lenx, lenxy, lox, loy, loz\n");
+      int ncells = txfxbx.numPts();
+      const auto lo  = amrex::lbound(txfxbx);
+      const auto len = amrex::length(txfxbx);
+      const auto lenxy = len.x*len.y;
+      const auto lenx = len.x;
+      fprintf(fid,"%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", bclx, bchx, dlx, dhx, cdir, ncells, lenx, lenxy, lo.x, lo.y, lo.z);
+      fclose(fid);
+    }
+
+    /* qmxy */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qmxy_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qmxy);
+      amrex::Dim3 len = amrex::length(qmxy);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qmxy.size(), qmxy.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qmxy.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qmxy.dataPtr(), sizeof(amrex::Real) * qmxy.size());
+      sprintf(fname,"%s/%s_qmxy_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qmxy.size(), fid);
+      fclose(fid);
+    }
+    /* qmxz */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qmxz_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qmxz);
+      amrex::Dim3 len = amrex::length(qmxz);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qmxz.size(), qmxz.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qmxz.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qmxz.dataPtr(), sizeof(amrex::Real) * qmxz.size());
+      sprintf(fname,"%s/%s_qmxz_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qmxz.size(), fid);
+      fclose(fid);
+    }
+    /* qpxy */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qpxy_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qpxy);
+      amrex::Dim3 len = amrex::length(qpxy);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qpxy.size(), qpxy.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qpxy.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qpxy.dataPtr(), sizeof(amrex::Real) * qpxy.size());
+      sprintf(fname,"%s/%s_qpxy_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qpxy.size(), fid);
+      fclose(fid);
+    }
+    /* qpxz */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qpxz_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qpxz);
+      amrex::Dim3 len = amrex::length(qpxz);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qpxz.size(), qpxz.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qpxz.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qpxz.dataPtr(), sizeof(amrex::Real) * qpxz.size());
+      sprintf(fname,"%s/%s_qpxz_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qpxz.size(), fid);
+      fclose(fid);
+    }
+    /* flxy */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_flxy_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(flxy);
+      amrex::Dim3 len = amrex::length(flxy);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      flxy.size(), flxy.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(flxy.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), flxy.dataPtr(), sizeof(amrex::Real) * flxy.size());
+      sprintf(fname,"%s/%s_flxy_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), flxy.size(), fid);
+      fclose(fid);
+    }
+    /* flxz */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_flxz_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(flxz);
+      amrex::Dim3 len = amrex::length(flxz);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      flxz.size(), flxz.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(flxz.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), flxz.dataPtr(), sizeof(amrex::Real) * flxz.size());
+      sprintf(fname,"%s/%s_flxz_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), flxz.size(), fid);
+      fclose(fid);
+    }
+    /* qxy */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qxy_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qxy);
+      amrex::Dim3 len = amrex::length(qxy);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qxy.size(), qxy.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qxy.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qxy.dataPtr(), sizeof(amrex::Real) * qxy.size());
+      sprintf(fname,"%s/%s_qxy_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qxy.size(), fid);
+      fclose(fid);
+    }
+    /* qxz */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qxz_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qxz);
+      amrex::Dim3 len = amrex::length(qxz);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qxz.size(), qxz.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qxz.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qxz.dataPtr(), sizeof(amrex::Real) * qxz.size());
+      sprintf(fname,"%s/%s_qxz_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qxz.size(), fid);
+      fclose(fid);
+    }
+    /* qaux */
+    {
+      FILE * fid;
+      char fname[100];
+      sprintf(fname,"%s/%s_metadata_qaux_%d.csv",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      std::ifstream infile(fname);
+      fid = fopen(fname,"wt");
+      fprintf(fid,"size, nComp, jstride, kstride, nstride, beginx, beginy, beginz\n");
+      amrex::Dim3 lb = amrex::lbound(qaux);
+      amrex::Dim3 len = amrex::length(qaux);
+      fprintf(fid,"%zu, %d, %d, %d, %d, %d, %d, %d\n",
+	      qaux.size(), qaux.nComp(), len.x, len.x*len.y, len.x*len.y*len.z, lb.x, lb.y, lb.z);
+      fclose(fid);
+
+      std::vector<amrex::Real> temp(qaux.size());
+      amrex::Gpu::dtoh_memcpy(temp.data(), qaux.dataPtr(), sizeof(amrex::Real) * qaux.size());
+      sprintf(fname,"%s/%s_qaux_rank_%d.bin",name.c_str(),name.c_str(),amrex::ParallelContext::MyProcSub());
+      fid = fopen(fname,"wb");
+      fwrite(temp.data(), sizeof(amrex::Real), qaux.size(), fid);
+      fclose(fid);
+    }
+#endif
+    amrex::Abort("Exiting Here");
+  }
   checkArray4(flxz, "flxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qxy, "qxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qxz, "qxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 #endif
+  
   // Y interface corrections
   cdir = 1;
   const amrex::Box& tybx = grow(bxg1, cdir, 1);
@@ -323,13 +540,12 @@ pc_umeth_3D(
     pc_transdo(
       AMREX_D_DECL(i, j, k), cdir, 2, qmyz, qpyz, qymarr, qyparr, fzarr, qaux,
       gdtempz, cdtdz);
-  });
-  
+  });  
 #if 1
-  //checkArray4(qmyx, "qmyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
-  //checkArray4(qpyx, "qpyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
-  //checkArray4(qmyz, "qmyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
-  //checkArray4(qpyz, "qpyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qmyx, "qmyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qpyx, "qpyx", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qmyz, "qmyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qpyz, "qpyz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 #endif
   // Riemann problem Y|X Y|Z
   const amrex::Box& tyfxbx = surroundingNodes(bxg1, cdir);
@@ -434,17 +650,21 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, qm, qp, qxmarr, qxparr, flyz, flzy, qyz, qzy,
       qaux, srcQ, hdt, hdtdy, hdtdz);
   });
+#if 1
   checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Final X flux
   amrex::ParallelFor(xfxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_cmpflx(
       i, j, k, bclx, bchx, dlx, dhx, qm, qp, flx[0], qec[0], qaux, cdir);
   });
+#if 1
   checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
-
+#endif
+  
   // Y | X&Z
   cdir = 1;
   const amrex::Box& yfxbx = surroundingNodes(bx, cdir);
@@ -454,16 +674,20 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, qm, qp, qymarr, qyparr, flxz, flzx, qxz, qzx,
       qaux, srcQ, hdt, hdtdx, hdtdz);
   });
+#if 1
   checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Final Y flux
   amrex::ParallelFor(yfxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_cmpflx(
       i, j, k, bcly, bchy, dly, dhy, qm, qp, flx[1], qec[1], qaux, cdir);
   });
+#if 1
   checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Z | X&Y
   cdir = 2;
@@ -474,16 +698,20 @@ pc_umeth_3D(
       AMREX_D_DECL(i, j, k), cdir, qm, qp, qzmarr, qzparr, flxy, flyx, qxy, qyx,
       qaux, srcQ, hdt, hdtdx, hdtdy);
   });
+#if 1
   checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Final Z flux
   amrex::ParallelFor(zfxbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
     pc_cmpflx(
       i, j, k, bclz, bchz, dlz, dhz, qm, qp, flx[2], qec[2], qaux, cdir);
   });
+#if 1
   checkArray4(qm, "qm", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qp, "qp", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+#endif
 
   // Fix bcnormal boundaries - always use PLM and don't do N+1/2 predictor
   // because the user specifies conditions at N
@@ -521,9 +749,10 @@ pc_umeth_3D(
       i, j, k, pdivu, AMREX_D_DECL(qec[0], qec[1], qec[2]),
       AMREX_D_DECL(a[0], a[1], a[2]), vol);
   });
+#if 1
   checkArray4(vol, "vol", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
-  checkArray4(pdivu, "pdivu", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
-  
+  checkArray4(pdivu, "pdivu", __FILE__, __FUNCTION__, __LINE__, hasBadValues);  
+#endif
 }
 
 #elif AMREX_SPACEDIM == 2

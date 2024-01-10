@@ -61,6 +61,24 @@ void checkArray4(amrex::Array4<const amrex::Real> const X, const std::string nam
     }
 }
 
+
+
+bool checkArray4(amrex::Array4<const amrex::Real> const X, const std::string name,
+		 const char * FILE, const char * FUNCTION, const int LINE)
+{
+  auto numBad1 = amrex::FArrayBox(X).count_bad<amrex::RunOn::Device>();
+  if (numBad1)
+    {
+      auto numBad2 = thrust::count_if(thrust::device.on(amrex::Gpu::gpuStream()), X.dataPtr(), X.dataPtr()+X.size(), is_bad<amrex::Real>());
+      amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::"
+		     << FUNCTION << "::L#" << LINE << " : " << name << " has " << numBad1 << " BAD (AMReX reduction) values out of " << X.size() << std::endl;
+      amrex::Print() << "rank=" << amrex::ParallelContext::MyProcSub() << FILE << "::"
+		     << FUNCTION << "::L#" << LINE << " : " << name << " has " << numBad2 << " BAD (Thrust reduction) values out of " << X.size() << std::endl;
+      return true;
+    }
+  return false;
+}
+
 #ifdef PELEC_USE_SPRAY
 #include "SprayParticles.H"
 #endif

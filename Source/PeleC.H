@@ -32,6 +32,9 @@ enum StateType { State_Type = 0, Reactions_Type, Work_Estimate_Type };
 void checkArray4(amrex::Array4<const amrex::Real> const X, const std::string name,
 		 const char * FILE, const char * FUNCTION, const int LINE,
 		 bool& hasBadValues);
+
+bool checkArray4(amrex::Array4<const amrex::Real> const X, const std::string name,
+		 const char * FILE, const char * FUNCTION, const int LINE);
   
 
 enum sources {

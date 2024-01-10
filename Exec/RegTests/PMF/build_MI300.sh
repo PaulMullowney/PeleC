@@ -1,6 +1,7 @@
 #!/bin/bash -l
 model=LiDryer
 arch=gfx940
+nompi=NO
 
 for i in "$@"; do
     case "$1" in
@@ -16,17 +17,28 @@ for i in "$@"; do
 	    mpi="${i#*=}"
 	    shift # past argument=value
 	    ;;
+        -without-mpi|--without-mpi)
+	    nompi=YES
+	    shift # past argument=value
+	    ;;
 	--)
             shift
             break
             ;;
     esac
 done
-
 export AMD_ARCH=$arch
 export ROCM_PATH=/opt/rocm
 export PATH=/opt/cmake-3.24.2/:$PATH
-if [ -z ${mpi+x} ]; #check if value is passed as an arg
+MPI=TRUE
+
+if [ $nompi == "YES" ];
+then
+    # explicitly disable MPI
+    echo "Building without MPI"
+    MPI=FALSE
+    
+elif [ -z ${mpi+x} ]; #check if value is passed as an arg
 then
     #attempt to read any ompi version in /opt
     mpi=$(readlink -f /opt/omp*)
@@ -52,12 +64,17 @@ export HIP_PLATFORM=amd
 TRACE=FALSE
 
 #Build SUNDIALS (requires internet connection because a clone happens)
-make -j 1 USE_ROCTX=$TRACE Chemistry_Model=$model TPLrealclean
-make -j 32 USE_ROCTX=$TRACE Chemistry_Model=$model TPL
+make -j 1 USE_ROCTX=$TRACE USE_MPI=$MPI Chemistry_Model=$model TPLrealclean
+make -j 32 USE_ROCTX=$TRACE USE_MPI=$MPI Chemistry_Model=$model TPL
 
 #Build PeleC
-make -j 1 USE_ROCTX=$TRACE Chemistry_Model=$model realclean
-make -j 32 USE_ROCTX=$TRACE Chemistry_Model=$model
+make -j 1 USE_ROCTX=$TRACE USE_MPI=$MPI Chemistry_Model=$model realclean
+make -j 32 USE_ROCTX=$TRACE USE_MPI=$MPI Chemistry_Model=$model
 
 # Copy the executable
-mv PeleC3d.hip.TPROF.MPI.HIP.ex PeleC3d.hip.TPROF.MPI.HIP.ex.$model
+if [ $nompi == "YES" ];
+then
+    mv PeleC3d.hip.TPROF.HIP.ex PeleC3d.hip.TPROF.HIP.ex.$model
+else
+    mv PeleC3d.hip.TPROF.MPI.HIP.ex PeleC3d.hip.TPROF.MPI.HIP.ex.$model
+fi
