@@ -1,4 +1,4 @@
-#include "Godunov.H"
+#Include "Godunov.H"
 #include "PLM.H"
 #include "PPM.H"
 #include "PeleC.H"
@@ -273,6 +273,7 @@ pc_umeth_3D(
   checkArray4(qpxy, "qpxy", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qmxz, "qmxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
   checkArray4(qpxz, "qpxz", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
+  checkArray4(qaux, "qaux", __FILE__, __FUNCTION__, __LINE__, hasBadValues);
 #endif
   const amrex::Box& txfxbx = surroundingNodes(bxg1, cdir);
   amrex::FArrayBox fluxxy(txfxbx, NVAR, amrex::The_Async_Arena());
