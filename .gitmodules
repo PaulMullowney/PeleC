@@ -1,4 +1,5 @@
 [submodule "Submodules/PelePhysics"]
 	path = Submodules/PelePhysics
-	url = https://github.com/AMReX-Combustion/PelePhysics.git
-	shallow = true
+	url = git@github.com:PaulMullowney/PelePhysics.git
+        branch = paulm_opts
+	
