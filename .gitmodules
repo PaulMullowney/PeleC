@@ -1,5 +1,5 @@
 [submodule "Submodules/PelePhysics"]
 	path = Submodules/PelePhysics
-	url = git@github.com:PaulMullowney/PelePhysics.git
+	url = https://github.com/PaulMullowney/PelePhysics.git
         branch = paulm_opts
 	
